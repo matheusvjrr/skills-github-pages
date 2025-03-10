@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conversor de Coordenadas - CB </title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f8f9fa;
+            flex-direction: column;
+        }
+        .container {
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        input, button {
+            margin: 10px;
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        button {
+            background: #dc3545;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #c82333;
+        }
+        #map {
+            width: 600px;
+            height: 400px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+</head>
+<body>
+    <div class="container">
+        <h2>Conversor de Coordenadas</h2>
+        <label>Coordenadas (Graus, Minutos, Segundos):</label>
+        <input type="text" id="coordinates" placeholder="Ex: S3°24'51.372 W39°1'31.62">
+        <button onclick="convertCoordinates()">Converter</button>
+        <h3>Resultado:</h3>
+        <p id="resultado"></p>
+        <button onclick="copyLat()">Copiar Latitude</button>
+        <button onclick="copyLon()">Copiar Longitude</button>
+        <h3>Endereço Aproximado:</h3>
+        <p id="endereco"></p>
+    </div>
+    <div id="map"></div>
+    <script>
+        let map = L.map('map').setView([0, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+        let marker;
+        let lastLat = "";
+        let lastLon = "";
+
+        function convertCoordinates() {
+            let input = document.getElementById("coordinates").value;
+            let regex = /([NS])?(\d+)°(\d+)'(\d+[.,]?\d*)?\s*([EW])?(\d+)°(\d+)'(\d+[.,]?\d*)?/i;
+            let match = input.match(regex);
+            
+            if (match) {
+                let latSign = match[1] && match[1].toUpperCase() === 'S' ? -1 : 1;
+                let latDeg = parseFloat(match[2]);
+                let latMin = parseFloat(match[3]);
+                let latSec = match[4] ? parseFloat(match[4].replace(',', '.')) : 0;
+                let latitude = latSign * (latDeg + latMin / 60 + latSec / 3600);
+                
+                let lonSign = match[5] && match[5].toUpperCase() === 'W' ? -1 : 1;
+                let lonDeg = parseFloat(match[6]);
+                let lonMin = parseFloat(match[7]);
+                let lonSec = match[8] ? parseFloat(match[8].replace(',', '.')) : 0;
+                let longitude = lonSign * (lonDeg + lonMin / 60 + lonSec / 3600);
+                
+                lastLat = latitude.toFixed(6).replace('.', ',');
+                lastLon = longitude.toFixed(6).replace('.', ',');
+                
+                document.getElementById("resultado").textContent = `${lastLat}, ${lastLon}`;
+                getAddress(latitude, longitude);
+                updateMap(latitude, longitude);
+            } else {
+                document.getElementById("resultado").textContent = "Formato inválido";
+                document.getElementById("endereco").textContent = "";
+            }
+        }
+        
+        function copyLat() {
+            navigator.clipboard.writeText(lastLat).then(() => {
+                alert("Latitude copiada!");
+            });
+        }
+        
+        function copyLon() {
+            navigator.clipboard.writeText(lastLon).then(() => {
+                alert("Longitude copiada!");
+            });
+        }
+        
+        function getAddress(lat, lon) {
+            let url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`;
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.address) {
+                        let endereco = "";
+                        
+                        if (data.address.road) endereco += data.address.road + ", ";
+                        if (data.address.suburb) endereco += data.address.suburb + " - ";
+                        if (data.address.city) endereco += data.address.city + ", ";
+                        if (data.address.state) endereco += data.address.state + " - ";
+                        if (data.address.country) endereco += data.address.country;
+                        
+                        document.getElementById("endereco").textContent = endereco;
+                    } else {
+                        document.getElementById("endereco").textContent = "Endereço não encontrado";
+                    }
+                })
+                .catch(() => {
+                    document.getElementById("endereco").textContent = "Erro ao buscar o endereço";
+                });
+        }
+
+        function updateMap(lat, lon) {
+            map.setView([lat, lon], 15);
+            if (marker) {
+                marker.setLatLng([lat, lon]);
+            } else {
+                marker = L.marker([lat, lon]).addTo(map);
+            }
+        }
+    </script>
+</body>
+</html>
